@@ -1007,22 +1007,22 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		switch (visibility) {
 			case ('default'):
 				this._win.setMenuBarVisibility(!isFullscreen);
-				this._win.autoHideMenuBar = isFullscreen;
+				this._win.setAutoHideMenuBar(isFullscreen);
 				break;
 
 			case ('visible'):
 				this._win.setMenuBarVisibility(true);
-				this._win.autoHideMenuBar = false;
+				this._win.setAutoHideMenuBar(false);
 				break;
 
 			case ('toggle'):
 				this._win.setMenuBarVisibility(false);
-				this._win.autoHideMenuBar = true;
+				this._win.setAutoHideMenuBar(true);
 				break;
 
 			case ('hidden'):
 				this._win.setMenuBarVisibility(false);
-				this._win.autoHideMenuBar = false;
+				this._win.setAutoHideMenuBar(false);
 				break;
 		}
 	}

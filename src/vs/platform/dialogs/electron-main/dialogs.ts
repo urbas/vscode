@@ -173,12 +173,12 @@ export class DialogMainService implements IDialogMainService {
 
 	showOpenDialog(options: OpenDialogOptions, window?: BrowserWindow): Promise<OpenDialogReturnValue> {
 
-		function normalizePaths(paths: string[]): string[] {
+		function normalizePaths(paths: string[] | undefined): string[] {
 			if (paths && paths.length > 0 && isMacintosh) {
 				paths = paths.map(path => normalizeNFC(path)); // normalize paths returned from the OS
 			}
 
-			return paths;
+			return paths || [];
 		}
 
 		return this.getDialogQueue(window).queue(async () => {
