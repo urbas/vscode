@@ -2303,6 +2303,10 @@ export class CommandCenter {
 
 	@command('git.openDiff', { repository: false })
 	async openDiff(uri: Uri, hash: string) {
+		if (hash === '~') {
+			return commands.executeCommand('vscode.diff', toGitUri(uri, hash), toGitUri(uri, `HEAD`));
+		}
+
 		return commands.executeCommand('vscode.diff', toGitUri(uri, hash), toGitUri(uri, `${hash}^`));
 	}
 
