@@ -61,6 +61,9 @@
 }
 .monaco-editor .marker-widget .descriptioncontainer .message a.code-link > span {
 	text-decoration: underline;
+	/** Hack to force underline to show **/
+	border-bottom: 1px solid transparent;
+	text-underline-position: under;
 }
 
 .monaco-editor .marker-widget .descriptioncontainer .filename {
