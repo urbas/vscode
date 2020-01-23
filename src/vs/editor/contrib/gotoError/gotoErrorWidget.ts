@@ -27,6 +27,10 @@ import { IActionBarOptions, ActionsOrientation } from 'vs/base/browser/ui/action
 import { SeverityIcon } from 'vs/platform/severityIcon/common/severityIcon';
 import { EditorOption } from 'vs/editor/common/config/editorOptions';
 import { IOpenerService } from 'vs/platform/opener/common/opener';
+import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
+import { OperatingSystem, OS } from 'vs/base/common/platform';
+
+type ModifierKey = 'meta' | 'ctrl' | 'alt';
 
 class MessageWidget {
 
@@ -40,11 +44,14 @@ class MessageWidget {
 	private readonly _relatedDiagnostics = new WeakMap<HTMLElement, IRelatedInformation>();
 	private readonly _disposables: DisposableStore = new DisposableStore();
 
+	private _clickModifierKey: ModifierKey;
+
 	constructor(
 		parent: HTMLElement,
 		editor: ICodeEditor,
 		onRelatedInformation: (related: IRelatedInformation) => void,
-		private readonly _openerService: IOpenerService
+		private readonly _openerService: IOpenerService,
+		private readonly _configurationService: IConfigurationService
 	) {
 		this._editor = editor;
 
@@ -80,6 +87,13 @@ class MessageWidget {
 			domNode.style.top = `-${e.scrollTop}px`;
 		}));
 		this._disposables.add(this._scrollable);
+
+		this._clickModifierKey = this._getClickModifierKey();
+		this._disposables.add(this._configurationService.onDidChangeConfiguration(e => {
+			if (e.affectsConfiguration('editor.multiCursorModifier')) {
+				this._clickModifierKey = this._getClickModifierKey();
+			}
+		}));
 	}
 
 	dispose(): void {
@@ -135,9 +149,11 @@ class MessageWidget {
 					codeLinkElement.setAttribute('href', `${code.link.toString()}`);
 
 					codeLinkElement.onclick = (e) => {
-						this._openerService.open(code.link);
 						e.preventDefault();
-						e.stopPropagation();
+						if ((this._clickModifierKey === 'meta' && e.metaKey) || (this._clickModifierKey === 'ctrl' && e.ctrlKey) || (this._clickModifierKey === 'alt' && e.altKey)) {
+							this._openerService.open(code.link);
+							e.stopPropagation();
+						}
 					};
 
 					const codeElement = dom.append(codeLinkElement, dom.$('span'));
@@ -190,6 +206,19 @@ class MessageWidget {
 	getHeightInLines(): number {
 		return Math.min(17, this._lines);
 	}
+
+	private _getClickModifierKey(): ModifierKey {
+		const value = this._configurationService.getValue<'ctrlCmd' | 'alt'>('editor.multiCursorModifier');
+		if (value === 'ctrlCmd') {
+			return 'alt';
+		} else {
+			if (OS === OperatingSystem.Macintosh) {
+				return 'meta';
+			} else {
+				return 'ctrl';
+			}
+		}
+	}
 }
 
 export class MarkerNavigationWidget extends PeekViewWidget {
@@ -210,7 +239,8 @@ export class MarkerNavigationWidget extends PeekViewWidget {
 		editor: ICodeEditor,
 		private readonly actions: ReadonlyArray<IAction>,
 		private readonly _themeService: IThemeService,
-		private readonly _openerService: IOpenerService
+		private readonly _openerService: IOpenerService,
+		private readonly _configurationService: IConfigurationService
 	) {
 		super(editor, { showArrow: true, showFrame: true, isAccessible: true });
 		this._severity = MarkerSeverity.Warning;
@@ -280,7 +310,7 @@ export class MarkerNavigationWidget extends PeekViewWidget {
 		this._container = document.createElement('div');
 		container.appendChild(this._container);
 
-		this._message = new MessageWidget(this._container, this.editor, related => this._onDidSelectRelatedInformation.fire(related), this._openerService);
+		this._message = new MessageWidget(this._container, this.editor, related => this._onDidSelectRelatedInformation.fire(related), this._openerService, this._configurationService);
 		this._disposables.add(this._message);
 	}
 
@@ -359,8 +389,9 @@ export const editorMarkerNavigationInfo = registerColor('editorMarkerNavigationI
 export const editorMarkerNavigationBackground = registerColor('editorMarkerNavigation.background', { dark: '#2D2D30', light: Color.white, hc: '#0C141F' }, nls.localize('editorMarkerNavigationBackground', 'Editor marker navigation widget background.'));
 
 registerThemingParticipant((theme, collector) => {
-	const link = theme.getColor(textLinkForeground);
-	if (link) {
-		collector.addRule(`.monaco-editor .marker-widget a { color: ${link}; }`);
+	const linkFg = theme.getColor(textLinkForeground);
+	if (linkFg) {
+		collector.addRule(`.monaco-editor .marker-widget a { color: ${linkFg}; }`);
+		collector.addRule(`.monaco-editor .marker-widget a.code-link span:hover { color: ${linkFg}; }`);
 	}
 });

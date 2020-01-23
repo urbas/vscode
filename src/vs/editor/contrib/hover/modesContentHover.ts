@@ -22,7 +22,7 @@ import { getHover } from 'vs/editor/contrib/hover/getHover';
 import { HoverOperation, HoverStartMode, IHoverComputer } from 'vs/editor/contrib/hover/hoverOperation';
 import { ContentHoverWidget } from 'vs/editor/contrib/hover/hoverWidgets';
 import { MarkdownRenderer } from 'vs/editor/contrib/markdown/markdownRenderer';
-import { IThemeService } from 'vs/platform/theme/common/themeService';
+import { IThemeService, registerThemingParticipant } from 'vs/platform/theme/common/themeService';
 import { coalesce, isNonEmptyArray, asArray } from 'vs/base/common/arrays';
 import { IMarker, IMarkerData, MarkerSeverity } from 'vs/platform/markers/common/markers';
 import { basename } from 'vs/base/common/resources';
@@ -39,6 +39,9 @@ import { IModeService } from 'vs/editor/common/services/modeService';
 import { IIdentifiedSingleEditOperation } from 'vs/editor/common/model';
 import { EditorOption } from 'vs/editor/common/config/editorOptions';
 import { Constants } from 'vs/base/common/uint';
+import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
+import { OperatingSystem, OS } from 'vs/base/common/platform';
+import { textLinkForeground } from 'vs/platform/theme/common/colorRegistry';
 
 const $ = dom.$;
 
@@ -191,6 +194,8 @@ const markerCodeActionTrigger: CodeActionTrigger = {
 	filter: { include: CodeActionKind.QuickFix }
 };
 
+type ModifierKey = 'meta' | 'ctrl' | 'alt';
+
 export class ModesContentHoverWidget extends ContentHoverWidget {
 
 	static readonly ID = 'editor.contrib.modesContentHoverWidget';
@@ -204,6 +209,8 @@ export class ModesContentHoverWidget extends ContentHoverWidget {
 	private _shouldFocus: boolean;
 	private _colorPicker: ColorPickerWidget | null;
 
+	private _clickModifierKey: ModifierKey;
+
 	private readonly renderDisposable = this._register(new MutableDisposable<IDisposable>());
 
 	constructor(
@@ -213,6 +220,7 @@ export class ModesContentHoverWidget extends ContentHoverWidget {
 		private readonly _keybindingService: IKeybindingService,
 		private readonly _modeService: IModeService,
 		private readonly _openerService: IOpenerService = NullOpenerService,
+		private readonly _configurationService: IConfigurationService
 	) {
 		super(ModesContentHoverWidget.ID, editor);
 
@@ -249,6 +257,13 @@ export class ModesContentHoverWidget extends ContentHoverWidget {
 				this._renderMessages(this._lastRange, this._messages);
 			}
 		}));
+
+		this._clickModifierKey = this._getClickModifierKey();
+		this._register((this._configurationService.onDidChangeConfiguration(e => {
+			if (e.affectsConfiguration('editor.multiCursorModifier')) {
+				this._clickModifierKey = this._getClickModifierKey();
+			}
+		})));
 	}
 
 	dispose(): void {
@@ -516,9 +531,11 @@ export class ModesContentHoverWidget extends ContentHoverWidget {
 					codeLinkElement.setAttribute('href', code.link.toString());
 
 					codeLinkElement.onclick = (e) => {
-						this._openerService.open(code.link);
 						e.preventDefault();
-						e.stopPropagation();
+						if ((this._clickModifierKey === 'meta' && e.metaKey) || (this._clickModifierKey === 'ctrl' && e.ctrlKey) || (this._clickModifierKey === 'alt' && e.altKey)) {
+							this._openerService.open(code.link);
+							e.stopPropagation();
+						}
 					};
 
 					const codeElement = dom.append(codeLinkElement, $('span'));
@@ -527,7 +544,6 @@ export class ModesContentHoverWidget extends ContentHoverWidget {
 					const detailsElement = dom.append(markerElement, sourceAndCodeElement);
 					detailsElement.style.opacity = '0.6';
 					detailsElement.style.paddingLeft = '6px';
-					// detailsElement.innerText = source && code ? `${source}(${code})` : source ? source : `(${code})`;
 				}
 			}
 		}
@@ -650,6 +666,19 @@ export class ModesContentHoverWidget extends ContentHoverWidget {
 	private static readonly _DECORATION_OPTIONS = ModelDecorationOptions.register({
 		className: 'hoverHighlight'
 	});
+
+	private _getClickModifierKey(): ModifierKey {
+		const value = this._configurationService.getValue<'ctrlCmd' | 'alt'>('editor.multiCursorModifier');
+		if (value === 'ctrlCmd') {
+			return 'alt';
+		} else {
+			if (OS === OperatingSystem.Macintosh) {
+				return 'meta';
+			} else {
+				return 'ctrl';
+			}
+		}
+	}
 }
 
 function hoverContentsEquals(first: HoverPart[], second: HoverPart[]): boolean {
@@ -674,3 +703,11 @@ function hoverContentsEquals(first: HoverPart[], second: HoverPart[]): boolean {
 	}
 	return true;
 }
+
+registerThemingParticipant((theme, collector) => {
+	const linkFg = theme.getColor(textLinkForeground);
+	if (linkFg) {
+		collector.addRule(`.monaco-editor-hover .hover-contents a.code-link span:hover { color: ${linkFg}; }`);
+	}
+});
+

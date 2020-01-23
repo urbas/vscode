@@ -14,7 +14,7 @@ import { ResourceMarkers, Marker, RelatedInformation } from 'vs/workbench/contri
 import Messages from 'vs/workbench/contrib/markers/browser/messages';
 import { IInstantiationService } from 'vs/platform/instantiation/common/instantiation';
 import { attachBadgeStyler } from 'vs/platform/theme/common/styler';
-import { IThemeService } from 'vs/platform/theme/common/themeService';
+import { IThemeService, registerThemingParticipant } from 'vs/platform/theme/common/themeService';
 import { IDisposable, dispose, Disposable, toDisposable, DisposableStore } from 'vs/base/common/lifecycle';
 import { ActionBar } from 'vs/base/browser/ui/actionbar/actionbar';
 import { QuickFixAction, QuickFixActionViewItem } from 'vs/workbench/contrib/markers/browser/markersViewActions';
@@ -44,6 +44,9 @@ import { applyCodeAction } from 'vs/editor/contrib/codeAction/codeActionCommands
 import { SeverityIcon } from 'vs/platform/severityIcon/common/severityIcon';
 import { CodeActionTriggerType } from 'vs/editor/common/modes';
 import { IOpenerService } from 'vs/platform/opener/common/opener';
+import { textLinkForeground } from 'vs/platform/theme/common/colorRegistry';
+import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
+import { OS, OperatingSystem } from 'vs/base/common/platform';
 
 export type TreeElement = ResourceMarkers | Marker | RelatedInformation;
 
@@ -219,14 +222,15 @@ export class MarkerRenderer implements ITreeRenderer<Marker, MarkerFilterData, I
 	constructor(
 		private readonly markersViewState: MarkersViewModel,
 		@IInstantiationService protected instantiationService: IInstantiationService,
-		@IOpenerService protected openerService: IOpenerService
+		@IOpenerService protected openerService: IOpenerService,
+		@IConfigurationService private readonly _configurationService: IConfigurationService
 	) { }
 
 	templateId = TemplateId.Marker;
 
 	renderTemplate(container: HTMLElement): IMarkerTemplateData {
 		const data: IMarkerTemplateData = Object.create(null);
-		data.markerWidget = new MarkerWidget(container, this.markersViewState, this.openerService, this.instantiationService);
+		data.markerWidget = new MarkerWidget(container, this.markersViewState, this.openerService, this._configurationService, this.instantiationService);
 		return data;
 	}
 
@@ -240,6 +244,8 @@ export class MarkerRenderer implements ITreeRenderer<Marker, MarkerFilterData, I
 
 }
 
+type ModifierKey = 'meta' | 'ctrl' | 'alt';
+
 class MarkerWidget extends Disposable {
 
 	private readonly actionBar: ActionBar;
@@ -248,19 +254,29 @@ class MarkerWidget extends Disposable {
 	private readonly messageAndDetailsContainer: HTMLElement;
 	private readonly disposables = this._register(new DisposableStore());
 
+	private _clickModifierKey: ModifierKey;
+
 	constructor(
 		private parent: HTMLElement,
 		private readonly markersViewModel: MarkersViewModel,
-		private openerService: IOpenerService,
-		instantiationService: IInstantiationService
+		private readonly _openerService: IOpenerService,
+		private readonly _configurationService: IConfigurationService,
+		_instantiationService: IInstantiationService
 	) {
 		super();
 		this.actionBar = this._register(new ActionBar(dom.append(parent, dom.$('.actions')), {
-			actionViewItemProvider: (action: QuickFixAction) => action.id === QuickFixAction.ID ? instantiationService.createInstance(QuickFixActionViewItem, action) : undefined
+			actionViewItemProvider: (action: QuickFixAction) => action.id === QuickFixAction.ID ? _instantiationService.createInstance(QuickFixActionViewItem, action) : undefined
 		}));
 		this.icon = dom.append(parent, dom.$(''));
 		this.multilineActionbar = this._register(new ActionBar(dom.append(parent, dom.$('.multiline-actions'))));
 		this.messageAndDetailsContainer = dom.append(parent, dom.$('.marker-message-details-container'));
+
+		this._clickModifierKey = this._getClickModifierKey();
+		this.disposables.add((this._configurationService.onDidChangeConfiguration(e => {
+			if (e.affectsConfiguration('editor.multiCursorModifier')) {
+				this._clickModifierKey = this._getClickModifierKey();
+			}
+		})));
 	}
 
 	render(element: Marker, filterData: MarkerFilterData | undefined): void {
@@ -351,9 +367,11 @@ class MarkerWidget extends Disposable {
 					codeLinkAnchor.setAttribute('href', codeLink);
 
 					codeLinkAnchor.onclick = (e) => {
-						this.openerService.open(codeUri);
 						e.preventDefault();
-						e.stopPropagation();
+						if ((this._clickModifierKey === 'meta' && e.metaKey) || (this._clickModifierKey === 'ctrl' && e.ctrlKey) || (this._clickModifierKey === 'alt' && e.altKey)) {
+							this._openerService.open(codeUri);
+							e.stopPropagation();
+						}
 					};
 
 					const code = new HighlightedLabel(dom.append(codeLinkAnchor, dom.$('.marker-code')), false);
@@ -365,6 +383,19 @@ class MarkerWidget extends Disposable {
 
 		const lnCol = dom.append(parent, dom.$('span.marker-line'));
 		lnCol.textContent = Messages.MARKERS_PANEL_AT_LINE_COL_NUMBER(marker.startLineNumber, marker.startColumn);
+	}
+
+	private _getClickModifierKey(): ModifierKey {
+		const value = this._configurationService.getValue<'ctrlCmd' | 'alt'>('editor.multiCursorModifier');
+		if (value === 'ctrlCmd') {
+			return 'alt';
+		} else {
+			if (OS === OperatingSystem.Macintosh) {
+				return 'meta';
+			} else {
+				return 'ctrl';
+			}
+		}
 	}
 }
 
@@ -789,3 +820,10 @@ export class ResourceDragAndDrop implements ITreeDragAndDrop<TreeElement> {
 	drop(data: IDragAndDropData, targetElement: TreeElement, targetIndex: number, originalEvent: DragEvent): void {
 	}
 }
+
+registerThemingParticipant((theme, collector) => {
+	const linkFg = theme.getColor(textLinkForeground);
+	if (linkFg) {
+		collector.addRule(`.markers-panel .markers-panel-container .tree-container .monaco-tl-contents .details-container a.code-link span:hover { color: ${linkFg}; }`);
+	}
+});
