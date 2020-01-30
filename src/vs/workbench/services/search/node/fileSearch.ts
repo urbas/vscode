@@ -20,7 +20,7 @@ import * as strings from 'vs/base/common/strings';
 import * as types from 'vs/base/common/types';
 import { URI } from 'vs/base/common/uri';
 import { readdir } from 'vs/base/node/pfs';
-import { IFileQuery, IFolderQuery, IProgressMessage, ISearchEngineStats, IRawFileMatch, ISearchEngine, ISearchEngineSuccess } from 'vs/workbench/services/search/common/search';
+import { IFileQuery, IFolderQuery, IProgressMessage, ISearchEngineStats, IRawFileMatch, ISearchEngine, ISearchEngineSuccess, isFilePatternMatch } from 'vs/workbench/services/search/common/search';
 import { spawnRipgrepCmd } from './ripgrepFileSearch';
 import { prepareQuery } from 'vs/base/parts/quickopen/common/quickOpenScorer';
 
@@ -557,7 +557,7 @@ export class FileWalker {
 	}
 
 	private matchFile(onResult: (result: IRawFileMatch) => void, candidate: IRawFileMatch): void {
-		if (this.isFilePatternMatch(candidate.relativePath) && (!this.includePattern || this.includePattern(candidate.relativePath, candidate.basename))) {
+		if (this.isFileMatch(candidate) && (!this.includePattern || this.includePattern(candidate.relativePath, candidate.basename))) {
 			this.resultCount++;
 
 			if (this.exists || (this.maxResults && this.resultCount > this.maxResults)) {
@@ -570,8 +570,7 @@ export class FileWalker {
 		}
 	}
 
-	private isFilePatternMatch(path: string): boolean {
-
+	private isFileMatch(candidate: IRawFileMatch): boolean {
 		// Check for search pattern
 		if (this.filePattern) {
 			if (this.filePattern === '*') {
@@ -579,7 +578,7 @@ export class FileWalker {
 			}
 
 			if (this.normalizedFilePatternLowercase) {
-				return strings.fuzzyContains(path, this.normalizedFilePatternLowercase);
+				return isFilePatternMatch(candidate, this.normalizedFilePatternLowercase);
 			}
 		}
 

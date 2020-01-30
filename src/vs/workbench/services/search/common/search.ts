@@ -9,13 +9,13 @@ import * as glob from 'vs/base/common/glob';
 import { IDisposable } from 'vs/base/common/lifecycle';
 import * as objects from 'vs/base/common/objects';
 import * as extpath from 'vs/base/common/extpath';
-import { getNLines } from 'vs/base/common/strings';
+import { fuzzyContains, getNLines } from 'vs/base/common/strings';
 import { URI, UriComponents } from 'vs/base/common/uri';
 import { IFilesConfiguration } from 'vs/platform/files/common/files';
 import { createDecorator } from 'vs/platform/instantiation/common/instantiation';
 import { ITelemetryData } from 'vs/platform/telemetry/common/telemetry';
 import { Event } from 'vs/base/common/event';
-import { relative } from 'vs/base/common/path';
+import { join, basename, relative } from 'vs/base/common/path';
 
 export const VIEWLET_ID = 'workbench.view.search';
 export const PANEL_ID = 'workbench.panel.search';
@@ -480,6 +480,11 @@ export function isSerializedSearchSuccess(arg: ISerializedSearchComplete): arg i
 
 export function isSerializedFileMatch(arg: ISerializedSearchProgressItem): arg is ISerializedFileMatch {
 	return !!(<ISerializedFileMatch>arg).path;
+}
+
+export function isFilePatternMatch(candidate: IRawFileMatch, normalizedFilePatternLowercase: string): boolean {
+	const pathToMatch = candidate.base ? join(basename(candidate.base), candidate.relativePath) : candidate.relativePath;
+	return fuzzyContains(pathToMatch, normalizedFilePatternLowercase);
 }
 
 export interface ISerializedFileMatch {
