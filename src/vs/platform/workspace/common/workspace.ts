@@ -106,8 +106,7 @@ export interface IWorkspace {
 	readonly configuration?: URI | null;
 }
 
-export interface IWorkspaceFolderData {
-
+export interface INamedFolder {
 	/**
 	 * The associated URI for this workspace folder.
 	 */
@@ -118,7 +117,9 @@ export interface IWorkspaceFolderData {
 	 * the basename its [uri-path](#Uri.path)
 	 */
 	readonly name: string;
+}
 
+export interface IWorkspaceFolderData extends INamedFolder {
 	/**
 	 * The ordinal number of this workspace folder.
 	 */
@@ -228,8 +229,12 @@ export class WorkspaceFolder implements IWorkspaceFolder {
 	}
 }
 
+export function toNamedFolder(folder: URI): INamedFolder {
+	return { uri: folder, name: resources.basenameOrAuthority(folder) };
+}
+
 export function toWorkspaceFolder(resource: URI): WorkspaceFolder {
-	return new WorkspaceFolder({ uri: resource, index: 0, name: resources.basenameOrAuthority(resource) }, { uri: resource.toString() });
+	return new WorkspaceFolder({ ...toNamedFolder(resource), index: 0 }, { uri: resource.toString() });
 }
 
 export function toWorkspaceFolders(configuredFolders: IStoredWorkspaceFolder[], workspaceConfigFile: URI): WorkspaceFolder[] {

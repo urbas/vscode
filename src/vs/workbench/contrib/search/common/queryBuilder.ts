@@ -16,7 +16,7 @@ import { isMultilineRegexSource } from 'vs/editor/common/model/textModelSearch';
 import * as nls from 'vs/nls';
 import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
 import { IEnvironmentService } from 'vs/platform/environment/common/environment';
-import { IWorkspaceContextService, WorkbenchState } from 'vs/platform/workspace/common/workspace';
+import { IWorkspaceContextService, WorkbenchState, INamedFolder } from 'vs/platform/workspace/common/workspace';
 import { getExcludes, ICommonQueryProps, IFileQuery, IFolderQuery, IPatternInfo, ISearchConfiguration, ITextQuery, ITextSearchPreviewOptions, pathIncludedInQuery, QueryType } from 'vs/workbench/services/search/common/search';
 import { Schemas } from 'vs/base/common/network';
 
@@ -134,8 +134,9 @@ export class QueryBuilder {
 		return newPattern;
 	}
 
-	file(folderResources: uri[] | undefined, options: IFileQueryBuilderOptions = {}): IFileQuery {
-		const commonQuery = this.commonQuery(folderResources, options);
+	file(namedFolders: INamedFolder[], options: IFileQueryBuilderOptions = {}): IFileQuery {
+		// TODO: Create a query with named folders
+		const commonQuery = this.commonQuery(namedFolders.map(namedFolder => namedFolder.uri), options);
 		return <IFileQuery>{
 			...commonQuery,
 			type: QueryType.File,

@@ -5,7 +5,7 @@
 
 import * as assert from 'assert';
 import * as path from 'vs/base/common/path';
-import { Workspace, toWorkspaceFolders, WorkspaceFolder } from 'vs/platform/workspace/common/workspace';
+import { Workspace, toWorkspaceFolders, WorkspaceFolder, toNamedFolder } from 'vs/platform/workspace/common/workspace';
 import { URI } from 'vs/base/common/uri';
 import { IRawFileWorkspaceFolder } from 'vs/platform/workspaces/common/workspaces';
 import { isWindows } from 'vs/base/common/platform';
@@ -213,5 +213,9 @@ suite('Workspace', () => {
 		assert.equal((<IRawFileWorkspaceFolder>actual[2].raw).path, '/abc/test1');
 		assert.equal(actual[2].index, 2);
 		assert.equal(actual[2].name, 'test1');
+	});
+
+	test('toNamedFolder takes the basename of the URI', () => {
+		assert.deepEqual({ uri: testFolderUri, name: 'test' }, toNamedFolder(testFolderUri));
 	});
 });
