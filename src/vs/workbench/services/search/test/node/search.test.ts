@@ -216,7 +216,7 @@ suite('FileSearchEngine', () => {
 			}
 		}, () => { }, (error) => {
 			assert.ok(!error);
-			assert.equal(count, 11);
+			assert.equal(count, 7);
 			done();
 		});
 	});
@@ -746,7 +746,7 @@ suite('FileSearchEngine', () => {
 			}
 		}, () => { }, (error) => {
 			assert.ok(!error);
-			assert.equal(count, 2);
+			assert.equal(count, 1);
 			done();
 		});
 	});

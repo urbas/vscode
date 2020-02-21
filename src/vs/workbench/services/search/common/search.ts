@@ -15,7 +15,7 @@ import { IFilesConfiguration } from 'vs/platform/files/common/files';
 import { createDecorator } from 'vs/platform/instantiation/common/instantiation';
 import { ITelemetryData } from 'vs/platform/telemetry/common/telemetry';
 import { Event } from 'vs/base/common/event';
-import { join, basename, relative } from 'vs/base/common/path';
+import { relative } from 'vs/base/common/path';
 
 export const VIEWLET_ID = 'workbench.view.search';
 export const PANEL_ID = 'workbench.panel.search';
@@ -50,6 +50,7 @@ export interface ISearchResultProvider {
 
 export interface IFolderQuery<U extends UriComponents = URI> {
 	folder: U;
+	folderName?: string;
 	excludePattern?: glob.IExpression;
 	includePattern?: glob.IExpression;
 	fileEncoding?: string;
@@ -82,6 +83,15 @@ export interface IFileQueryProps<U extends UriComponents> extends ICommonQueryPr
 	exists?: boolean;
 	sortByScore?: boolean;
 	cacheKey?: string;
+	/**
+	 * If true file search should include the name of the containing folder when matching the file.
+	 * This is useful in workspaces that contain more than one folder.
+	 *
+	 * Note that the name of the folder is taken from the name assigned to the folder by the
+	 * workspace. This allows you to distinguish workspace folders that have the same name on
+	 * the filesystem
+	 */
+	includeFolderName?: boolean;
 }
 
 export interface ITextQueryProps<U extends UriComponents> extends ICommonQueryProps<U> {
@@ -433,9 +443,21 @@ export interface IRawSearchService {
 
 export interface IRawFileMatch {
 	base?: string;
+	/**
+	 * The path of the file relative to the containing `base` folder.
+	 * This path is exactly as it appears on the filesystem.
+	 */
 	relativePath: string;
 	basename: string;
 	size?: number;
+	/**
+	 * This path is transformed for search purposes. For example, this could be
+	 * the `relativePath` with the workspace folder name prepended. This way the
+	 * search algorithm would also match against the name of the containing folder.
+	 *
+	 * If not given, the search algorithm should use `relativePath`.
+	 */
+	searchPath?: string;
 }
 
 export interface ISearchEngine<T> {
@@ -483,7 +505,7 @@ export function isSerializedFileMatch(arg: ISerializedSearchProgressItem): arg i
 }
 
 export function isFilePatternMatch(candidate: IRawFileMatch, normalizedFilePatternLowercase: string): boolean {
-	const pathToMatch = candidate.base ? join(basename(candidate.base), candidate.relativePath) : candidate.relativePath;
+	const pathToMatch = candidate.searchPath ? candidate.searchPath : candidate.relativePath;
 	return fuzzyContains(pathToMatch, normalizedFilePatternLowercase);
 }
 

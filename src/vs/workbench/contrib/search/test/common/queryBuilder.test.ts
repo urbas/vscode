@@ -99,6 +99,7 @@ suite('QueryBuilder', () => {
 					folder: ROOT_1_URI
 				}],
 				type: QueryType.File,
+				includeFolderName: false,
 				includePattern: {
 					'**/foo, **/bar': true
 				}
@@ -372,6 +373,7 @@ suite('QueryBuilder', () => {
 			{
 				folderQueries: [],
 				filePattern: content,
+				includeFolderName: false,
 				type: QueryType.File
 			});
 	});

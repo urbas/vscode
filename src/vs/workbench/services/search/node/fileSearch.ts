@@ -247,7 +247,7 @@ export class FileWalker {
 			if (noSiblingsClauses) {
 				for (const relativePath of relativeFiles) {
 					const basename = path.basename(relativePath);
-					this.matchFile(onResult, { base: rootFolder, relativePath, basename });
+					this.matchFile(onResult, { base: rootFolder, relativePath, searchPath: this.getSearchPath(folderQuery, relativePath), basename });
 					if (this.isLimitHit) {
 						killCmd();
 						break;
@@ -540,7 +540,13 @@ export class FileWalker {
 							return clb(null, undefined); // ignore file if max file size is hit
 						}
 
-						this.matchFile(onResult, { base: rootFolder.fsPath, relativePath: currentRelativePath, basename: file, size: stat.size });
+						this.matchFile(onResult, {
+							base: rootFolder.fsPath,
+							relativePath: currentRelativePath,
+							searchPath: this.getSearchPath(folderQuery, currentRelativePath),
+							basename: file,
+							size: stat.size,
+						});
 					}
 
 					// Unwind
@@ -606,6 +612,19 @@ export class FileWalker {
 		}
 
 		return clb(null, path);
+	}
+
+	/**
+	 * If we're searching for files in multiple workspace folders, then better prepend the
+	 * name of the workspace folder to the path of the file. This way we'll be able to
+	 * better filter files that are all on the top of a workspace folder and have all the
+	 * same name. A typical example are `package.json` or `README.md` files.
+	 */
+	private getSearchPath(folderQuery: IFolderQuery, relativePath: string): string {
+		if (this.config.includeFolderName && folderQuery.folderName) {
+			return path.join(folderQuery.folderName, relativePath);
+		}
+		return relativePath;
 	}
 }
 

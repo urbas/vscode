@@ -16,7 +16,7 @@ import { isMultilineRegexSource } from 'vs/editor/common/model/textModelSearch';
 import * as nls from 'vs/nls';
 import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
 import { IEnvironmentService } from 'vs/platform/environment/common/environment';
-import { IWorkspaceContextService, WorkbenchState, INamedFolder } from 'vs/platform/workspace/common/workspace';
+import { IWorkspaceContextService, WorkbenchState, INamedFolder, toNamedFolder } from 'vs/platform/workspace/common/workspace';
 import { getExcludes, ICommonQueryProps, IFileQuery, IFolderQuery, IPatternInfo, ISearchConfiguration, ITextQuery, ITextSearchPreviewOptions, pathIncludedInQuery, QueryType } from 'vs/workbench/services/search/common/search';
 import { Schemas } from 'vs/base/common/network';
 
@@ -94,7 +94,7 @@ export class QueryBuilder {
 			return !folderConfig.search.useRipgrep;
 		});
 
-		const commonQuery = this.commonQuery(folderResources, options);
+		const commonQuery = this.commonQuery(folderResources?.map(toNamedFolder), options);
 		return <ITextQuery>{
 			...commonQuery,
 			type: QueryType.Text,
@@ -135,8 +135,7 @@ export class QueryBuilder {
 	}
 
 	file(namedFolders: INamedFolder[], options: IFileQueryBuilderOptions = {}): IFileQuery {
-		// TODO: Create a query with named folders
-		const commonQuery = this.commonQuery(namedFolders.map(namedFolder => namedFolder.uri), options);
+		const commonQuery = this.commonQuery(namedFolders, options);
 		return <IFileQuery>{
 			...commonQuery,
 			type: QueryType.File,
@@ -145,11 +144,13 @@ export class QueryBuilder {
 				: options.filePattern,
 			exists: options.exists,
 			sortByScore: options.sortByScore,
-			cacheKey: options.cacheKey
+			cacheKey: options.cacheKey,
+			includeFolderName: namedFolders.length > 1,
 		};
 	}
 
-	private commonQuery(folderResources: uri[] = [], options: ICommonQueryBuilderOptions = {}): ICommonQueryProps<uri> {
+	private commonQuery(folderResources: INamedFolder[] = [], options: ICommonQueryBuilderOptions = {}): ICommonQueryProps<uri> {
+		// TODO: Create a query with named folders
 		let includeSearchPathsInfo: ISearchPathsInfo = {};
 		if (options.includePattern) {
 			const includePattern = normalizeSlashes(options.includePattern);
@@ -169,7 +170,7 @@ export class QueryBuilder {
 		// Build folderQueries from searchPaths, if given, otherwise folderResources
 		const folderQueries = (includeSearchPathsInfo.searchPaths && includeSearchPathsInfo.searchPaths.length ?
 			includeSearchPathsInfo.searchPaths.map(searchPath => this.getFolderQueryForSearchPath(searchPath, options, excludeSearchPathsInfo)) :
-			folderResources.map(uri => this.getFolderQueryForRoot(uri, options, excludeSearchPathsInfo)))
+			folderResources.map(namedFolder => this.getFolderQueryForRoot(namedFolder, options, excludeSearchPathsInfo)))
 			.filter(query => !!query) as IFolderQuery[];
 
 		const queryProps: ICommonQueryProps<uri> = {
@@ -404,7 +405,7 @@ export class QueryBuilder {
 	}
 
 	private getFolderQueryForSearchPath(searchPath: ISearchPathPattern, options: ICommonQueryBuilderOptions, searchPathExcludes: ISearchPathsInfo): IFolderQuery | null {
-		const rootConfig = this.getFolderQueryForRoot(searchPath.searchPath, options, searchPathExcludes);
+		const rootConfig = this.getFolderQueryForRoot(toNamedFolder(searchPath.searchPath), options, searchPathExcludes);
 		if (!rootConfig) {
 			return null;
 		}
@@ -417,10 +418,10 @@ export class QueryBuilder {
 		};
 	}
 
-	private getFolderQueryForRoot(folder: uri, options: ICommonQueryBuilderOptions, searchPathExcludes: ISearchPathsInfo): IFolderQuery | null {
+	private getFolderQueryForRoot(folder: INamedFolder, options: ICommonQueryBuilderOptions, searchPathExcludes: ISearchPathsInfo): IFolderQuery | null {
 		let thisFolderExcludeSearchPathPattern: glob.IExpression | undefined;
 		if (searchPathExcludes.searchPaths) {
-			const thisFolderExcludeSearchPath = searchPathExcludes.searchPaths.filter(sp => isEqual(sp.searchPath, folder))[0];
+			const thisFolderExcludeSearchPath = searchPathExcludes.searchPaths.filter(sp => isEqual(sp.searchPath, folder.uri))[0];
 			if (thisFolderExcludeSearchPath && !thisFolderExcludeSearchPath.pattern) {
 				// entire folder is excluded
 				return null;
@@ -429,7 +430,7 @@ export class QueryBuilder {
 			}
 		}
 
-		const folderConfig = this.configurationService.getValue<ISearchConfiguration>({ resource: folder });
+		const folderConfig = this.configurationService.getValue<ISearchConfiguration>({ resource: folder.uri });
 		const settingExcludes = this.getExcludesForFolder(folderConfig, options);
 		const excludePattern: glob.IExpression = {
 			...(settingExcludes || {}),
@@ -437,7 +438,8 @@ export class QueryBuilder {
 		};
 
 		return <IFolderQuery>{
-			folder,
+			folder: folder.uri,
+			folderName: folder.name,
 			excludePattern: Object.keys(excludePattern).length > 0 ? excludePattern : undefined,
 			fileEncoding: folderConfig.files && folderConfig.files.encoding,
 			disregardIgnoreFiles: typeof options.disregardIgnoreFiles === 'boolean' ? options.disregardIgnoreFiles : !folderConfig.search.useIgnoreFiles,
