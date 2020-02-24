@@ -16,7 +16,7 @@ import { isMultilineRegexSource } from 'vs/editor/common/model/textModelSearch';
 import * as nls from 'vs/nls';
 import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
 import { IEnvironmentService } from 'vs/platform/environment/common/environment';
-import { IWorkspaceContextService, WorkbenchState, INamedFolder, toNamedFolder } from 'vs/platform/workspace/common/workspace';
+import { IWorkspaceContextService, WorkbenchState, toWorkspaceFolder, IWorkspaceFolderData } from 'vs/platform/workspace/common/workspace';
 import { getExcludes, ICommonQueryProps, IFileQuery, IFolderQuery, IPatternInfo, ISearchConfiguration, ITextQuery, ITextSearchPreviewOptions, pathIncludedInQuery, QueryType } from 'vs/workbench/services/search/common/search';
 import { Schemas } from 'vs/base/common/network';
 
@@ -94,7 +94,7 @@ export class QueryBuilder {
 			return !folderConfig.search.useRipgrep;
 		});
 
-		const commonQuery = this.commonQuery(folderResources?.map(toNamedFolder), options);
+		const commonQuery = this.commonQuery(folderResources?.map(toWorkspaceFolder), options);
 		return <ITextQuery>{
 			...commonQuery,
 			type: QueryType.Text,
@@ -134,8 +134,8 @@ export class QueryBuilder {
 		return newPattern;
 	}
 
-	file(namedFolders: INamedFolder[], options: IFileQueryBuilderOptions = {}): IFileQuery {
-		const commonQuery = this.commonQuery(namedFolders, options);
+	file(folders: IWorkspaceFolderData[], options: IFileQueryBuilderOptions = {}): IFileQuery {
+		const commonQuery = this.commonQuery(folders, options);
 		return <IFileQuery>{
 			...commonQuery,
 			type: QueryType.File,
@@ -145,11 +145,11 @@ export class QueryBuilder {
 			exists: options.exists,
 			sortByScore: options.sortByScore,
 			cacheKey: options.cacheKey,
-			includeFolderName: namedFolders.length > 1,
+			includeFolderName: folders.length > 1,
 		};
 	}
 
-	private commonQuery(folderResources: INamedFolder[] = [], options: ICommonQueryBuilderOptions = {}): ICommonQueryProps<uri> {
+	private commonQuery(folderResources: IWorkspaceFolderData[] = [], options: ICommonQueryBuilderOptions = {}): ICommonQueryProps<uri> {
 		// TODO: Create a query with named folders
 		let includeSearchPathsInfo: ISearchPathsInfo = {};
 		if (options.includePattern) {
@@ -170,7 +170,7 @@ export class QueryBuilder {
 		// Build folderQueries from searchPaths, if given, otherwise folderResources
 		const folderQueries = (includeSearchPathsInfo.searchPaths && includeSearchPathsInfo.searchPaths.length ?
 			includeSearchPathsInfo.searchPaths.map(searchPath => this.getFolderQueryForSearchPath(searchPath, options, excludeSearchPathsInfo)) :
-			folderResources.map(namedFolder => this.getFolderQueryForRoot(namedFolder, options, excludeSearchPathsInfo)))
+			folderResources.map(folder => this.getFolderQueryForRoot(folder, options, excludeSearchPathsInfo)))
 			.filter(query => !!query) as IFolderQuery[];
 
 		const queryProps: ICommonQueryProps<uri> = {
@@ -405,7 +405,7 @@ export class QueryBuilder {
 	}
 
 	private getFolderQueryForSearchPath(searchPath: ISearchPathPattern, options: ICommonQueryBuilderOptions, searchPathExcludes: ISearchPathsInfo): IFolderQuery | null {
-		const rootConfig = this.getFolderQueryForRoot(toNamedFolder(searchPath.searchPath), options, searchPathExcludes);
+		const rootConfig = this.getFolderQueryForRoot(toWorkspaceFolder(searchPath.searchPath), options, searchPathExcludes);
 		if (!rootConfig) {
 			return null;
 		}
@@ -418,7 +418,7 @@ export class QueryBuilder {
 		};
 	}
 
-	private getFolderQueryForRoot(folder: INamedFolder, options: ICommonQueryBuilderOptions, searchPathExcludes: ISearchPathsInfo): IFolderQuery | null {
+	private getFolderQueryForRoot(folder: IWorkspaceFolderData, options: ICommonQueryBuilderOptions, searchPathExcludes: ISearchPathsInfo): IFolderQuery | null {
 		let thisFolderExcludeSearchPathPattern: glob.IExpression | undefined;
 		if (searchPathExcludes.searchPaths) {
 			const thisFolderExcludeSearchPath = searchPathExcludes.searchPaths.filter(sp => isEqual(sp.searchPath, folder.uri))[0];
