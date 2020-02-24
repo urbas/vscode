@@ -150,7 +150,6 @@ export class QueryBuilder {
 	}
 
 	private commonQuery(folderResources: IWorkspaceFolderData[] = [], options: ICommonQueryBuilderOptions = {}): ICommonQueryProps<uri> {
-		// TODO: Create a query with named folders
 		let includeSearchPathsInfo: ISearchPathsInfo = {};
 		if (options.includePattern) {
 			const includePattern = normalizeSlashes(options.includePattern);
