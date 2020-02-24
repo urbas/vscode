@@ -618,7 +618,7 @@ export class FileWalker {
 	 * same name. A typical example are `package.json` or `README.md` files.
 	 */
 	private getSearchPath(folderQuery: IFolderQuery, relativePath: string): string {
-		if (this.config.includeFolderName && folderQuery.folderName) {
+		if (folderQuery.folderName) {
 			return path.join(folderQuery.folderName, relativePath);
 		}
 		return relativePath;

@@ -83,15 +83,6 @@ export interface IFileQueryProps<U extends UriComponents> extends ICommonQueryPr
 	exists?: boolean;
 	sortByScore?: boolean;
 	cacheKey?: string;
-	/**
-	 * If true file search should include the name of the containing folder when matching the file.
-	 * This is useful in workspaces that contain more than one folder.
-	 *
-	 * Note that the name of the folder is taken from the name assigned to the folder by the
-	 * workspace. This allows you to distinguish workspace folders that have the same name on
-	 * the filesystem
-	 */
-	includeFolderName?: boolean;
 }
 
 export interface ITextQueryProps<U extends UriComponents> extends ICommonQueryProps<U> {
